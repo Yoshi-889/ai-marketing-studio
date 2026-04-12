@@ -1,9 +1,10 @@
 import streamlit as st
 import os
 import json
-import time
 import base64
+import time
 from datetime import datetime
+from streamlit_js_eval import streamlit_js_eval as _st_js_eval
 from config import MODE_CONFIG, COMMON_SETTINGS, QUALITY_CHECKLIST, IMAGE_PROMPTS
 from ai_clients import fetch_page_content, search_competitors
 from pipeline import PipelineState, execute_step, execute_image_generation
@@ -87,100 +88,108 @@ def init_session_state() -> None:
 # ============================================================================
 
 def render_api_keys_section() -> dict:
-    """APIキー設定セクション（Secrets → ブラウザ保存 → 手動入力）"""
-    from streamlit_js_eval import streamlit_js_eval as _st_js_eval
-
-    def get_api_key(secret_name: str) -> str:
-        try:
-            return st.secrets[secret_name]
-        except (KeyError, FileNotFoundError):
-            return os.environ.get(secret_name, "")
-
-    _sk_claude = get_api_key("ANTHROPIC_API_KEY")
-    _sk_openai = get_api_key("OPENAI_API_KEY")
-    _sk_gemini = get_api_key("GEMINI_API_KEY")
-    secrets_ok = bool(_sk_claude and _sk_openai and _sk_gemini)
-
-    # ブラウザ保存キーの初期化
-    if "bk" not in st.session_state:
-        st.session_state.bk = {"a": "", "o": "", "g": ""}
-        st.session_state.bk_loaded = False
-
-    # localStorageから読み込み
-    if not secrets_ok and not st.session_state.bk_loaded:
-        _js_val = _st_js_eval(
-            js_expressions='JSON.stringify({a:localStorage.getItem("ams_a")||"",o:localStorage.getItem("ams_o")||"",g:localStorage.getItem("ams_g")||""})'  ,
-            key="bk_load"
-        )
-        if _js_val is not None:
-            try:
-                st.session_state.bk = json.loads(_js_val)
-            except (json.JSONDecodeError, TypeError):
-                pass
-            st.session_state.bk_loaded = True
-            _bk = st.session_state.bk
-            if _bk.get("a") and _bk.get("o") and _bk.get("g"):
-                st.rerun()
-
-    bk = st.session_state.bk
-    browser_ok = bool(bk.get("a") and bk.get("o") and bk.get("g"))
+    """APIキー設定セクション（ブラウザlocalStorageへの保存対応）"""
+    st.sidebar.markdown("### 🔑 APIキー設定")
 
     api_keys = {}
 
+    # Secrets / 環境変数から取得を試みる
+    def _get_secret(name: str) -> str:
+        try:
+            return st.secrets[name]
+        except (KeyError, FileNotFoundError):
+            return os.environ.get(name, "")
+
+    _sk_anthropic = _get_secret("ANTHROPIC_API_KEY")
+    _sk_openai    = _get_secret("OPENAI_API_KEY")
+    _sk_gemini    = _get_secret("GEMINI_API_KEY")
+    secrets_ok = bool(_sk_anthropic and _sk_openai and _sk_gemini)
+
+    # ブラウザ保存キーの初期化
+    if "ms_bk" not in st.session_state:
+        st.session_state.ms_bk = {"a": "", "o": "", "g": ""}
+        st.session_state.ms_bk_loaded = False
+
+    # localStorageから読み込み（初回のみ）
+    if not secrets_ok and not st.session_state.ms_bk_loaded:
+        _js_val = _st_js_eval(
+            js_expressions='JSON.stringify({a:localStorage.getItem("aims_a")||"",o:localStorage.getItem("aims_o")||"",g:localStorage.getItem("aims_g")||""})',
+            key="ms_bk_load"
+        )
+        if _js_val is not None:
+            try:
+                st.session_state.ms_bk = json.loads(_js_val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            st.session_state.ms_bk_loaded = True
+            _bk = st.session_state.ms_bk
+            if _bk.get("a") and _bk.get("o") and _bk.get("g"):
+                st.rerun()
+
+    bk = st.session_state.ms_bk
+    browser_ok = bool(bk.get("a") and bk.get("o") and bk.get("g"))
+
     if secrets_ok:
+        # Secrets設定済み
         st.sidebar.success("🔑 APIキー: Secrets設定済み")
-        api_keys["anthropic"] = _sk_claude
-        api_keys["openai"] = _sk_openai
-        api_keys["gemini"] = _sk_gemini
+        api_keys["anthropic"] = _sk_anthropic
+        api_keys["openai"]    = _sk_openai
+        api_keys["gemini"]    = _sk_gemini
+
     elif browser_ok:
+        # localStorage保存済み
         st.sidebar.success("🔑 APIキー: 保存済み ✅")
         api_keys["anthropic"] = bk["a"]
-        api_keys["openai"] = bk["o"]
-        api_keys["gemini"] = bk["g"]
+        api_keys["openai"]    = bk["o"]
+        api_keys["gemini"]    = bk["g"]
         with st.sidebar.expander("🔧 キー管理", expanded=False):
-            if st.button("🗑️ 保存したキーを削除", use_container_width=True):
+            if st.button("🗑️ 保存したキーを削除", use_container_width=True, key="del_ms_keys"):
                 _st_js_eval(
-                    js_expressions='localStorage.removeItem("ams_a");localStorage.removeItem("ams_o");localStorage.removeItem("ams_g");"ok"',
-                    key="del_keys"
+                    js_expressions='localStorage.removeItem("aims_a");localStorage.removeItem("aims_o");localStorage.removeItem("aims_g");"ok"',
+                    key="ms_del_keys"
                 )
-                st.session_state.bk = {"a": "", "o": "", "g": ""}
-                st.session_state.bk_loaded = True
+                st.session_state.ms_bk = {"a": "", "o": "", "g": ""}
+                st.session_state.ms_bk_loaded = True
                 st.rerun()
+
     else:
-        st.sidebar.markdown("### 🔑 APIキー設定")
+        # 手動入力
         api_keys["anthropic"] = st.sidebar.text_input(
-            "Anthropic API Key", type="password", key="anthropic_key"
+            "Anthropic API Key", type="password", key="anthropic_key",
+            placeholder="sk-ant-..."
         )
         api_keys["openai"] = st.sidebar.text_input(
-            "OpenAI API Key", type="password", key="openai_key"
+            "OpenAI API Key", type="password", key="openai_key",
+            placeholder="sk-..."
         )
         api_keys["gemini"] = st.sidebar.text_input(
-            "Google Gemini API Key", type="password", key="gemini_key"
+            "Google Gemini API Key", type="password", key="gemini_key",
+            placeholder="AI..."
         )
 
+        # 3つ揃ったら保存ボタンを表示
         if api_keys["anthropic"] and api_keys["openai"] and api_keys["gemini"]:
-            if st.sidebar.button("💾 ブラウザに保存", type="primary", use_container_width=True):
-                _save_js = f'localStorage.setItem("ams_a",'+json.dumps(api_keys["anthropic"])+');localStorage.setItem("ams_o",'+json.dumps(api_keys["openai"])+');localStorage.setItem("ams_g",'+json.dumps(api_keys["gemini"])+');"ok"'
-                _st_js_eval(js_expressions=_save_js, key="save_keys")
-                st.session_state.bk = {"a": api_keys["anthropic"], "o": api_keys["openai"], "g": api_keys["gemini"]}
-                st.session_state.bk_loaded = True
-                st.sidebar.success("✅ 保存完了！次回から自動読み込み")
+            if st.sidebar.button("💾 ブラウザに保存", type="primary", use_container_width=True, key="save_ms_keys"):
+                _save_js = (
+                    f'localStorage.setItem("aims_a",{json.dumps(api_keys["anthropic"])});'
+                    f'localStorage.setItem("aims_o",{json.dumps(api_keys["openai"])});'
+                    f'localStorage.setItem("aims_g",{json.dumps(api_keys["gemini"])});"ok"'
+                )
+                _st_js_eval(js_expressions=_save_js, key="ms_save_keys")
+                st.session_state.ms_bk = {
+                    "a": api_keys["anthropic"],
+                    "o": api_keys["openai"],
+                    "g": api_keys["gemini"]
+                }
+                st.session_state.ms_bk_loaded = True
+                st.sidebar.success("✅ 保存完了！次回から自動読み込みされます")
                 time.sleep(1)
                 st.rerun()
             st.sidebar.caption("💡 このブラウザにのみ保存されます")
 
-        # ステータス表示
-        st.sidebar.markdown("**APIステータス**")
-        status_cols = st.sidebar.columns(3)
-        status_cols[0].markdown(
-            f"{'✅' if api_keys['anthropic'] else '❌'} Anthropic"
-        )
-        status_cols[1].markdown(
-            f"{'✅' if api_keys['openai'] else '❌'} OpenAI"
-        )
-        status_cols[2].markdown(
-            f"{'✅' if api_keys['gemini'] else '❌'} Gemini"
-        )
+    api_keys.setdefault("anthropic", "")
+    api_keys.setdefault("openai", "")
+    api_keys.setdefault("gemini", "")
 
     st.sidebar.divider()
 
@@ -192,8 +201,19 @@ def render_api_keys_section() -> dict:
             "Google Search Engine ID", type="password", key="search_engine_id_key"
         )
 
+    # ステータス表示
+    st.sidebar.markdown("**APIステータス**")
+    status_cols = st.sidebar.columns(3)
+    status_cols[0].markdown(f"{'✅' if api_keys['anthropic'] else '❌'} Anthropic")
+    status_cols[1].markdown(f"{'✅' if api_keys['openai'] else '❌'} OpenAI")
+    status_cols[2].markdown(f"{'✅' if api_keys['gemini'] else '❌'} Gemini")
+
     return api_keys
 
+
+# ============================================================================
+# サイドバー - 学習データセクション
+# ============================================================================
 
 def render_learning_data_section() -> None:
     """学習データセクション"""
@@ -510,7 +530,7 @@ def render_seo_mode_form() -> None:
 
     if research_method == "URLを入力":
         st.session_state.form_data["competitor_urls"] = st.text_area(
-            "競合URLを1行1つずつ入力",
+            "競合URLを1行1つぞつ入力",
             value=st.session_state.form_data.get("competitor_urls", ""),
             height=100,
             key="competitor_urls_input"
@@ -1001,7 +1021,7 @@ def render_completion_screen(pipeline: PipelineState) -> None:
         # 学習データ
         learning_json = generate_session_json(pipeline, checked_items)
         st.download_button(
-            label="💾 学習データをダギンロード",
+            label="💾 学習データをダウンロード",
             data=json.dumps(learning_json, ensure_ascii=False, indent=2).encode("utf-8"),
             file_name=f"learning_{pipeline.mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json",
