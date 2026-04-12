@@ -10,16 +10,92 @@ from ai_clients import (
 )
 
 
-@dataclass
 class PipelineState:
-    """パイプラインの状態を管理するデータクラス"""
-    mode: str
-    current_step: int
-    steps_completed: list[dict] = field(default_factory=list)
-    user_edits: list[dict] = field(default_factory=list)
-    is_complete: bool = False
-    metadata: dict = field(default_factory=dict)
+    """パイプラインの状態を管理するクラス"""
 
+    def __init__(
+        self,
+        mode: str,
+        form_data: dict,
+        uploaded_data: dict,
+        api_keys: dict,
+        learning_data: dict = None,
+    ):
+        self.mode = mode
+        self.form_data = form_data
+        self.uploaded_data = uploaded_data
+        self.api_keys = api_keys
+        self.learning_data = learning_data
+        self.current_step: int = 1          # 1-indexed
+        self.step_results: list = []        # results per completed step
+        self._all_done: bool = False        # set True after user approves last step
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def total_steps(self) -> int:
+        return len(MODE_CONFIG.get(self.mode, {}).get("steps", []))
+
+    # ------------------------------------------------------------------
+    # State queries
+    # ------------------------------------------------------------------
+
+    def is_completed(self) -> bool:
+        """True once all steps have been executed and approved by the user."""
+        return self._all_done or self.current_step > self.total_steps
+
+    def has_current_step_result(self) -> bool:
+        """True if the current step has already produced a result (prevents re-execution)."""
+        return len(self.step_results) >= self.current_step
+
+    def get_current_step_name(self) -> str:
+        steps = MODE_CONFIG.get(self.mode, {}).get("steps", [])
+        idx = self.current_step - 1
+        if 0 <= idx < len(steps):
+            return steps[idx].get("name", f"ステップ{self.current_step}")
+        return "完了"
+
+    def get_final_result(self) -> str:
+        """Return the integration (last-step) result as a markdown string."""
+        if not self.step_results:
+            return ""
+        last = self.step_results[-1]
+        if isinstance(last, dict) and "results" in last:
+            parts = []
+            for ai_name, content in last["results"].items():
+                parts.append(f"### {ai_name}\n\n{content}")
+            return "\n\n---\n\n".join(parts)
+        return str(last)
+
+    # ------------------------------------------------------------------
+    # State mutations
+    # ------------------------------------------------------------------
+
+    def add_step_result(self, result: dict) -> None:
+        """Append the result produced by execute_step for the current step."""
+        # Remove any stale result at this position (e.g. after a reset)
+        while len(self.step_results) >= self.current_step:
+            self.step_results.pop()
+        self.step_results.append(result)
+
+    def reset_current_step(self) -> None:
+        """Drop the current step's result so the step can be re-executed."""
+        while len(self.step_results) >= self.current_step:
+            self.step_results.pop()
+        self._all_done = False
+
+    def move_to_next_step(self) -> None:
+        """Approve current step result and advance to the next step."""
+        self.current_step += 1
+        if self.current_step > self.total_steps:
+            self._all_done = True
+
+
+# ===========================================================================
+# Internal helpers
+# ===========================================================================
 
 def build_user_message(
     mode: str,
@@ -43,7 +119,7 @@ def build_user_message(
         learning_data: 学習済みデータ
 
     Returns:
-        構築されたメッセージ文字列
+        構築され�メッセージ文字列
     """
     mode_config = MODE_CONFIG.get(mode, {})
 
@@ -110,7 +186,17 @@ USP: {form_data.get('usp', '')}
     return message
 
 
-def execute_step(
+def _flatten_previous_results(step_results: list) -> list[dict]:
+    """Convert step_results (list of {"results": {...}}) to a flat list of {"ai_name", "content"}."""
+    flat = []
+    for step_result in step_results:
+        if isinstance(step_result, dict) and "results" in step_result:
+            for ai_name, content in step_result["results"].items():
+                flat.append({"ai_name": ai_name, "content": content})
+    return flat
+
+
+def _run_step_raw(
     step: int,
     mode: str,
     form_data: dict,
@@ -122,24 +208,13 @@ def execute_step(
     progress_callback: Callable = None,
 ) -> list[dict]:
     """
-    パイプラインのステップを実行
-
-    Args:
-        step: ステップ番号 (0, 1, 2)
-        mode: モード名
-        form_data: フォームデータ
-        api_keys: APIキー辞書
-        previous_results: 前のステップの結果
-        uploaded_data: アップロードされたデータ
-        competitor_data: 競合分析データ
-        learning_data: 学習済みデータ
-        progress_callback: 進捗コールバック関数
+    パイプラインのステップを実行（内部関数）
 
     Returns:
-        ステップの結果リスト
+        list[dict] with keys: step, ai_name, content, timestamp
     """
     if previous_results is None:
-        previous_results = []
+      2 previous_results = []
 
     if step == 0:
         # Step 0: 並列実行で3つの分析を実行
@@ -179,7 +254,7 @@ def execute_step(
 
         results = run_parallel(
             tasks,
-            progress_callback=progress_callback
+    2       progress_callback=progress_callback
         )
 
         formatted_results = []
@@ -192,7 +267,7 @@ def execute_step(
                 "timestamp": None
             })
 
-        return formatted_results
+  2     return formatted_results
 
     elif step == 1:
         # Step 1: リレー方式 Claude → Gemini → ChatGPT
@@ -204,7 +279,7 @@ def execute_step(
             previous_results=previous_results,
             uploaded_data=uploaded_data,
             competitor_data=competitor_data,
-            learning_data=learning_data
+         2  learning_data=learning_data
         )
 
         claude_result = call_claude(
@@ -289,46 +364,71 @@ def execute_step(
     return []
 
 
-def execute_image_generation(
-    mode: str,
-    step_results: list[dict],
-    form_data: dict,
-    api_key: str,
-    quality: str = "medium",
-) -> list[dict]:
+# ===========================================================================
+# Public API — these are the functions imported by app.py
+# ===========================================================================
+
+def execute_step(pipeline: "PipelineState") -> dict:
     """
-    パイプライン完了後に画像生成を実行
+    Execute the current step of the pipeline.
 
     Args:
-        mode: モード名
-        step_results: パイプラインの全ステップ結果
-        form_data: フォームデータ
-        api_key: OPENAI APIキー
-        quality: 画像品質 ("off", "medium", "high")
+        pipeline: PipelineState object
 
     Returns:
-        生成された画像情報のリスト
+        dict with key "results": {ai_name: content_str}
     """
+    step_index = pipeline.current_step - 1  # convert 1-indexed → 0-indexed
+    previous_flat = _flatten_previous_results(pipeline.step_results)
+
+    raw = _run_step_raw(
+      2 step=step_index,
+        mode=pipeline.mode,
+        form_data=pipeline.form_data,
+        api_keys=pipeline.api_keys,
+        previous_results=previous_flat,
+        uploaded_data=pipeline.uploaded_data,
+        learning_data=pipeline.learning_data,
+    )
+
+    return {"results": {r["ai_name"]: r["content"] for r in raw}}
+
+
+def execute_image_generation(pipeline: "PipelineState") -> list:
+    """
+    画像生成を実行する。
+
+    Args:
+        pipeline: PipelineState object
+
+    Returns:
+        list of image data (bytes or base64 strings)
+    """
+    mode = pipeline.mode
+    form_data = pipeline.form_data
+    api_key = pipeline.api_keys.get("openai", "")
+    quality = form_data.get("image_quality", "medium").lower()
+
     if quality == "off":
         return []
 
     image_count = 1
     prompt_base = f"クライアント: {form_data.get('client_name', '')}, 業界: {form_data.get('industry', '')}"
 
-    if mode == "SEO既存" or mode == "SEO新規":
+    if mode in ("SEO既存", "SEO新規", "seo"):
         prompt = f"{prompt_base}\nアイキャッチ画像を生成してください。"
         image_count = 1
-    elif mode == "広告":
+    elif mode in ("広告", "ads"):
         platform = form_data.get('platform', 'general')
         prompt = f"{prompt_base}\n{platform}用のバナー画像を生成してください。"
         image_count = 2 if quality == "high" else 1
-    elif mode == "LP":
+    elif mode in ("LP", "lp"):
         prompt = f"{prompt_base}\nヒーロー画像とセクション画像を生成してください。"
         image_count = 2
-    elif mode == "メール":
+    elif mode in ("メール", "email"):
         prompt = f"{prompt_base}\nメールヘッダー画像を生成してください。"
         image_count = 1
-    elif mode == "CRO":
+    elif mode in ("CRO", "cro"):
         prompt = f"{prompt_base}\n改善案のモックアップイメージを生成してください。"
         image_count = 1
     else:
@@ -341,13 +441,7 @@ def execute_image_generation(
             api_key=api_key,
             quality=quality
         )
-        results.append({
-            "type": "image",
-            "mode": mode,
-            "index": i + 1,
-            "content": image_result,
-            "prompt": prompt
-        })
+        results.append(image_result)
 
     return results
 
@@ -403,7 +497,7 @@ def format_step_results(results: list[dict], step: int) -> str:
 
     Returns:
         Markdown形式の整形結果
-    """
+   2"""
     ai_icons = {
         "Claude": "🤖",
         "Gemini": "✨",
