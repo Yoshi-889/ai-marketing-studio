@@ -533,7 +533,7 @@ def render_seo_mode_form() -> None:
             "競合URLを1行1つせつ入力",
             value=st.session_state.form_data.get("competitor_urls", ""),
             height=100,
-    0       key="competitor_urls_input"
+            key="competitor_urls_input"
         )
     else:
         st.session_state.form_data["competitor_search_keyword"] = st.text_input(
