@@ -35,7 +35,7 @@ def parse_keyword_csv(uploaded_file) -> dict:
         }
     """
     try:
-        if uploaded_file is None:
+  2     if uploaded_file is None:
             return {
                 "success": False,
                 "data": None,
@@ -47,7 +47,7 @@ def parse_keyword_csv(uploaded_file) -> dict:
         content = uploaded_file.getvalue().decode('utf-8')
 
         # CSV/TSV判別
-        if '\t' in content.split('\n')[0]:
+  2     if '\t' in content.split('\n')[0]:
             df = pd.read_csv(io.StringIO(content), sep='\t')
         else:
             df = pd.read_csv(io.StringIO(content))
@@ -128,7 +128,7 @@ def parse_ga4_data(uploaded_file) -> dict:
         df.columns = df.columns.str.strip()
 
         # 必要なカラムを抽出
-        summary = {
+ 2      summary = {
             "total_sessions": 0,
             "total_revenue": 0.0,
             "avg_conversion_rate": 0.0,
@@ -273,7 +273,7 @@ def parse_ad_data(uploaded_file) -> dict:
 
 def extract_text_from_pdf(uploaded_file) -> str:
     """
-    PDFからテキストを抽出する。
+    PDFからテキストをڊ�出する。
 
     Args:
         uploaded_file: Streamlit upload_file オブジェクト
@@ -390,61 +390,87 @@ def extract_newsletter_analysis(text: str) -> dict:
     }
 
 
-def generate_markdown_report(mode: str, steps_data: list[dict], metadata: dict) -> str:
+def generate_markdown_report(pipeline, checked_items: list) -> str:
     """
     パイプライン結果をMarkdownレポートに変換する。
 
     Args:
-        mode: パイプラインのモード（例: "keyword_research"）
-        steps_data: 各ステップの結果データのリスト
-        metadata: クライアント名、日付、モード等のメタデータ
+        pipeline: PipelineState オブジェクト
+        checked_items: 品質チェックリストでチェックされた項目
 
     Returns:
         Markdown形式のレポート文字列
     """
+    from datetime import datetime as _dt
+    from config import MODE_CONFIG
+
+    mode = pipeline.mode
+    form_data = pipeline.form_data
+    mode_config = MODE_CONFIG.get(mode, {})
+    mode_name = mode_config.get("name", mode)
+
     report = []
 
     # ヘッダー
     report.append("# AI Marketing Studio レポート\n")
-
-    if "client_name" in metadata:
-        report.append(f"**クライアント:** {metadata['client_name']}\n")
-
-    if "date" in metadata:
-        report.append(f"**作成日:** {metadata['date']}\n")
-
-    if "mode" in metadata:
-        report.append(f"**分析モード:** {mode}\n")
-
+    report.append(f"**クライアント:** {form_data.get('client_name', '')}\n")
+    report.append(f"**作成日:** {_dt.now().strftime('%Y年%m月%d日')}\n")
+    report.append(f"**分析モード:** {mode_name}\n")
     report.append("\n---\n")
 
     # 各ステップの結果
-    for i, step in enumerate(steps_data, 1):
-        if "title" in step:
-            report.append(f"\n## {i}. {step['title']}\n")
+    step_names = [s.get("name", f"ステップ{i+1}") for i, s in enumerate(mode_config.get("steps", []))]
+    for i, step_result in enumerate(pipeline.step_results):
+        step_label = step_names[i] if i < len(step_names) else f"ステップ{i+1}"
+        report.append(f"\n## ステップ {i+1}: {step_label}\n")
 
-        if "description" in step:
-            report.append(f"{step['description']}\n")
-
-        if "content" in step:
-            report.append(f"{step['content']}\n")
+        if isinstance(step_result, dict) and "results" in step_result:
+            for ai_name, content in step_result["results"].items():
+                report.append(f"\n### {ai_name}\n")
+                report.append(f"{content}\n")
 
         report.append("\n---\n")
+
+    # 品質チェックリスト
+    if checked_items:
+        report.append("\n## 品質チェックリスト\n")
+        for item in checked_items:
+            report.append(f"- ✅ {item}\n")
 
     return "\n".join(report)
 
 
-def generate_session_json(session_data: dict) -> str:
+def generate_session_json(pipeline, checked_items: list) -> dict:
     """
-    セッション全体のデータをJSON文字列に変換する。
+    セッション全体のデータをJSON辞書に変換する。
 
     Args:
-        session_data: セッションデータの辞書
+        pipeline: PipelineState オブジェクト
+        checked_items: 品質チェックリストでチェックされた項目
 
     Returns:
-        JSON形式の文字列
+        セッションデータの辞書
     """
-    return json.dumps(session_data, ensure_ascii=False, indent=2)
+    from datetime import datetime as _dt
+
+    steps_export = []
+    for i, step_result in enumerate(pipeline.step_results):
+        if isinstance(step_result, dict) and "results" in step_result:
+            steps_export.append({
+                "step": i + 1,
+                "results": step_result["results"]
+            })
+        else:
+            steps_export.append({"step": i + 1, "results": str(step_result)})
+
+    return {
+        "timestamp": _dt.now().isoformat(),
+        "mode": pipeline.mode,
+        "form_data": pipeline.form_data,
+        "steps": steps_export,
+        "quality_checklist": checked_items,
+        "learning_data": pipeline.learning_data or {},
+    }
 
 
 def create_learning_data(
