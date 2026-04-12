@@ -301,7 +301,7 @@ def render_mode_selection() -> None:
         {
             "key": "email",
             "icon": "📧",
-            "name": "メールマーケティング",
+            "name": "メ・ルマーケティング",
             "description": "メルマガシーケンスの作成・改善でリード育成"
         },
         {
@@ -431,7 +431,7 @@ def render_usp_competition_form() -> None:
     with col1:
         st.session_state.form_data["goal"] = st.selectbox(
             "主な目的",
-            ["", "CV獲得", "認知向上", "リテンション", "リード獲得"],
+            ["", "CV獲得", "認知向上", "リテンション", "リード㍲得"],
             index=0,
             key="goal_select"
         )
@@ -530,10 +530,10 @@ def render_seo_mode_form() -> None:
 
     if research_method == "URLを入力":
         st.session_state.form_data["competitor_urls"] = st.text_area(
-            "競合URLを1行1つぞつ入力",
+            "競合URLを1行1つせつ入力",
             value=st.session_state.form_data.get("competitor_urls", ""),
             height=100,
-            key="competitor_urls_input"
+    0       key="competitor_urls_input"
         )
     else:
         st.session_state.form_data["competitor_search_keyword"] = st.text_input(
@@ -761,7 +761,7 @@ def validate_form_data() -> tuple[bool, str]:
 
     elif mode == "ads":
         if not form.get("platforms"):
-            return False, "配信プラットフォームを選択してください"
+            return False, "遍信プラットフォームを選択してください"
 
     elif mode == "lp":
         if not form.get("target_action"):
@@ -883,8 +883,8 @@ def render_pipeline_execution() -> None:
 
     st.progress(progress, text=f"Step {current_step}/{total_steps}")
 
-    # 各ステップ実行
-    if not pipeline.is_completed():
+    # 各ステップ実行（まだ結果がないステップのみ実行）
+    if not pipeline.is_completed() and not pipeline.has_current_step_result():
         with st.spinner(f"Step {current_step}/{total_steps}: {pipeline.get_current_step_name()}中..."):
             try:
                 result = execute_step(pipeline)
@@ -896,7 +896,7 @@ def render_pipeline_execution() -> None:
                     pipeline.reset_current_step()
                     st.rerun()
 
-    # ステップ結果表示
+    # ステップ結果表社
     if pipeline.step_results:
         render_step_results(pipeline)
 
@@ -919,7 +919,7 @@ def render_step_results(pipeline: PipelineState) -> None:
 
     st.markdown(f"### Step {step_number} 完了")
 
-    # タブ表示
+    # タブ表�V
     if isinstance(latest_step, dict) and "results" in latest_step:
         results = latest_step["results"]
         tab_names = [
@@ -980,14 +980,14 @@ def render_completion_screen(pipeline: PipelineState) -> None:
     # 品質チェックリスト
     st.markdown("### 📋 品質チェックリスト")
     checked_items = []
-    for item in QUALITY_CHECKLIST:
+    for item in QUALITY_CHECKLIST.get(pipeline.mode, []):
         if st.checkbox(item):
             checked_items.append(item)
 
     st.divider()
 
     # 画像生成
-    if pipeline.form_data.get("image_quality") != "OFF":
+    if pipeline.fnrm_data.get("image_quality") != "OFF":
         st.markdown("### 🖼️ 画像生成")
 
         if st.button("画像を生成する"):
@@ -1002,7 +1002,7 @@ def render_completion_screen(pipeline: PipelineState) -> None:
     st.divider()
 
     # ダウンロード・次のアクション
-    st.markdown("### 📥 エクスポートと次のステップ")
+    st.markdown("### 📥 エワスポートと次のステップ")
 
     col1, col2 = st.columns(2)
 
