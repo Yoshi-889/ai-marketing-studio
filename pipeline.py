@@ -214,7 +214,7 @@ def _run_step_raw(
         list[dict] with keys: step, ai_name, content, timestamp
     """
     if previous_results is None:
-      2 previous_results = []
+        previous_results = []
 
     if step == 0:
         # Step 0: 並列実行で3つの分析を実行
@@ -254,7 +254,7 @@ def _run_step_raw(
 
         results = run_parallel(
             tasks,
-    2       progress_callback=progress_callback
+            progress_callback=progress_callback
         )
 
         formatted_results = []
@@ -267,7 +267,7 @@ def _run_step_raw(
                 "timestamp": None
             })
 
-  2     return formatted_results
+        return formatted_results
 
     elif step == 1:
         # Step 1: リレー方式 Claude → Gemini → ChatGPT
@@ -279,7 +279,7 @@ def _run_step_raw(
             previous_results=previous_results,
             uploaded_data=uploaded_data,
             competitor_data=competitor_data,
-         2  learning_data=learning_data
+            learning_data=learning_data
         )
 
         claude_result = call_claude(
@@ -382,7 +382,7 @@ def execute_step(pipeline: "PipelineState") -> dict:
     previous_flat = _flatten_previous_results(pipeline.step_results)
 
     raw = _run_step_raw(
-      2 step=step_index,
+        step=step_index,
         mode=pipeline.mode,
         form_data=pipeline.form_data,
         api_keys=pipeline.api_keys,
