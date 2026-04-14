@@ -199,12 +199,13 @@ def generate_image(
         }
 
 
-def run_parallel(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def run_parallel(tasks: list[dict[str, Any]], progress_callback=None) -> list[dict[str, Any]]:
     """
     複数のタスクを並列実行する関数
 
     Args:
-        tasks: {"fn": callable, "kwargs": dict}のリスト
+        tasks: {"fn": callable, "kwargs": dict, "name": str(任意)}のリスト
+        progress_callback: タスク完了時に呼ばれるコールバック関数(任意)
 
     Returns:
         実行結果のリスト（インデックス付き）
@@ -221,6 +222,9 @@ def run_parallel(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             idx = future_to_index[future]
             try:
                 results[idx] = future.result()
+                if progress_callback:
+                    name = tasks[idx].get("name", str(idx))
+                    progress_callback(name)
             except Exception as e:
                 results[idx] = {"error": str(e), "index": idx}
 
