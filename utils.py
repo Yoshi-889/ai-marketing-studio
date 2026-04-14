@@ -89,12 +89,14 @@ def parse_keyword_csv(uploaded_file) -> dict:
         }
 
 
-def parse_ga4_data(uploaded_file) -> dict:
+def parse_ga4_data(uploaded_file, target_url: str = None) -> dict:
     """
     GA4エクスポートデータ（CSV）を解析する。
+    target_urlが指定された場合、そのパスのデータのみ抽出する。
 
     Args:
         uploaded_file: Streamlit upload_file オブジェクト
+        target_url: フィルタ対象のURL（例: https://example.com/page）
 
     Returns:
         {
@@ -114,7 +116,8 @@ def parse_ga4_data(uploaded_file) -> dict:
             }
 
         content = uploaded_file.getvalue().decode('utf-8')
-        df = pd.read_csv(io.StringIO(content))
+        # #で始まるコメント行（GA4エクスポートのメタデータ）をスキップ
+        df = pd.read_csv(io.StringIO(content), comment='#')
 
         if df.empty:
             return {
@@ -127,31 +130,73 @@ def parse_ga4_data(uploaded_file) -> dict:
         # カラム名の正規化
         df.columns = df.columns.str.strip()
 
-        # 必要なカラムを抽出
+        # ページパス列を特定（日英両対応）
+        page_col = None
+        for col in ['ランディング ページ', 'Landing page', 'Page path', 'ページ パス']:
+            if col in df.columns:
+                page_col = col
+                break
+
+        # target_urlが指定されている場合、パスでフィルタリング
+        filter_applied = False
+        target_path = None
+        if target_url and page_col:
+            from urllib.parse import urlparse
+            parsed = urlparse(target_url.strip())
+            target_path = parsed.path if parsed.path else '/'
+            df_filtered = df[df[page_col] == target_path]
+            if not df_filtered.empty:
+                df = df_filtered
+                filter_applied = True
+
+        # 数値型に変換
+        numeric_cols = ['セッション', 'Sessions', '直帰率', 'Bounce rate',
+                        'セッションあたりの平均エンゲージメント時間',
+                        '合計収益', 'Revenue', 'アクティブ ユーザー', 'Active users',
+                        'キーイベント', '新規ユーザー数']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+        # サマリーを構築
         summary = {
             "total_sessions": 0,
             "total_revenue": 0.0,
-            "avg_conversion_rate": 0.0,
-            "page_count": len(df)
+            "avg_bounce_rate": 0.0,
+            "avg_engagement_time": 0.0,
+            "active_users": 0,
+            "page_count": len(df),
+            "target_path": target_path,
+            "filter_applied": filter_applied
         }
 
-        # セッション数を抽出
+        # セッション数
         if "Sessions" in df.columns:
             summary["total_sessions"] = int(df["Sessions"].sum())
         elif "セッション" in df.columns:
             summary["total_sessions"] = int(df["セッション"].sum())
 
-        # 収益を抽出
+        # 収益
         if "Revenue" in df.columns:
             summary["total_revenue"] = float(df["Revenue"].sum())
-        elif "収益" in df.columns:
-            summary["total_revenue"] = float(df["収益"].sum())
+        elif "合計収益" in df.columns:
+            summary["total_revenue"] = float(df["合計収益"].sum())
 
-        # コンバージョン率を抽出
-        if "Conversion rate" in df.columns:
-            summary["avg_conversion_rate"] = float(df["Conversion rate"].mean())
-        elif "コンバージョン率" in df.columns:
-            summary["avg_conversion_rate"] = float(df["コンバージョン率"].mean())
+        # 直帰率
+        if "Bounce rate" in df.columns:
+            summary["avg_bounce_rate"] = float(df["Bounce rate"].mean())
+        elif "直帰率" in df.columns:
+            summary["avg_bounce_rate"] = float(df["直帰率"].mean())
+
+        # エンゲージメント時間
+        if "セッションあたりの平均エンゲージメント時間" in df.columns:
+            summary["avg_engagement_time"] = float(df["セッションあたりの平均エンゲージメント時間"].mean())
+
+        # アクティブユーザー
+        if "Active users" in df.columns:
+            summary["active_users"] = int(df["Active users"].sum())
+        elif "アクティブ ユーザー" in df.columns:
+            summary["active_users"] = int(df["アクティブ ユーザー"].sum())
 
         return {
             "success": True,
