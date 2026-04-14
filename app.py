@@ -285,9 +285,6 @@ def render_sidebar() -> dict:
 # モード選択画面
 # ============================================================================
 
-def render_mode_selector() -> str:
-    """モード選択画面"""====================================================
-
 def render_mode_selection() -> None:
     """モード選択画面"""
     st.markdown("# 🎯 AI Marketing Studio v1.0.0")
@@ -317,7 +314,7 @@ def render_mode_selection() -> None:
             "key": "lp",
             "icon": "📄",
             "name": "ランディングページ",
-            "description": "高い転換率を実現するLP制作・改善"
+            "description": "高ぅ転換率を実現するLP制作・改善"
         },
         {
             "key": "cro",
@@ -354,13 +351,13 @@ def render_basic_info_form() -> None:
     st.markdown("### 📋 基本情報")
 
     st.session_state.form_data["client_name"] = st.text_input(
-        "クライアント名（件意）",
+        "クライアント名（任意）",
         value=st.session_state.form_data.get("client_name", ""),
         key="client_name_input"
     )
 
     st.session_state.form_data["industry"] = st.text_input(
-        "f��界/業種",
+        "業界/業種",
         value=st.session_state.form_data.get("industry", ""),
         key="industry_input"
     )
@@ -529,7 +526,7 @@ def render_seo_mode_form() -> None:
 
         # auto-suggest: AIがCSVからKWを提案
         if st.session_state.form_data.get("auto_suggest_keywords") and not st.session_state.form_data.get("target_keywords"):
-            if st.button("🤖 AIにターゲットKWを提案してした", key="btn_suggest_kw"):
+            if st.button("🤖 AIにターゲットKWを提案しせる", key="btn_suggest_kw"):
                 with st.spinner("AIがキーワードを分析中..."):
                     try:
                         from pipeline import suggest_target_keywords
@@ -612,7 +609,7 @@ def render_email_mode_form() -> None:
         st.session_state.uploaded_data["newsletter_analysis"] = analysis
         st.success("✅ メルマガを分析しました")
 
-    st.markdown("*#テストデータ（任意）**")
+    st.markdown("**テストデータ（任意）**")
     test_newsletter = st.file_uploader(
         "メルマガテスト（ビフォーアフター比較用）",
         type=["pdf", "txt"],
@@ -1056,7 +1053,7 @@ def render_completion_screen(pipeline: PipelineState) -> None:
     st.divider()
 
     # 画像生成
-    if pipeline.fnrm_data.get("image_quality") != "OFF":
+    if pipeline.form_data.get("image_quality") != "OFF":
         st.markdown("### 🖼️ 画像生成")
 
         if st.button("画像を生成する"):
