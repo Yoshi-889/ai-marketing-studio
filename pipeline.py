@@ -251,6 +251,16 @@ def _flatten_previous_results(step_results: list) -> list[dict]:
     return flat
 
 
+def _extract_content(result) -> str:
+    """AI APIのレスポンスdictから文字列コンテンツを取り出す。"""
+    if isinstance(result, dict):
+        content = result.get("content", "")
+        if not result.get("success", True):
+            return f"❌ エラー: {content}"
+        return content if isinstance(content, str) else str(content)
+    return str(result)
+
+
 def _run_step_raw(
     step: int,
     mode: str,
@@ -323,7 +333,7 @@ def _run_step_raw(
             formatted_results.append({
                 "step": 0,
                 "ai_name": ai_names[i],
-                "content": result,
+                "content": _extract_content(result),
                 "timestamp": None
             })
 
@@ -350,7 +360,7 @@ def _run_step_raw(
         results.append({
             "step": 1,
             "ai_name": "Claude",
-            "content": claude_result,
+            "content": _extract_content(claude_result),
             "timestamp": None
         })
         if progress_callback:
@@ -373,7 +383,7 @@ def _run_step_raw(
         results.append({
             "step": 1,
             "ai_name": "Gemini",
-            "content": gemini_result,
+            "content": _extract_content(gemini_result),
             "timestamp": None
         })
         if progress_callback:
@@ -396,7 +406,7 @@ def _run_step_raw(
         results.append({
             "step": 1,
             "ai_name": "ChatGPT",
-            "content": chatgpt_result,
+            "content": _extract_content(chatgpt_result),
             "timestamp": None
         })
         if progress_callback:
@@ -420,7 +430,7 @@ def _run_step_raw(
         return [{
             "step": 2,
             "ai_name": "Claude",
-            "content": claude_result,
+            "content": _extract_content(claude_result),
             "timestamp": None,
             "is_integration": True
         }]
