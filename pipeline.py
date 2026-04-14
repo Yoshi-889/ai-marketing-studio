@@ -239,7 +239,7 @@ def _run_step_raw(
                 "func": call_gemini,
                 "kwargs": {
                     "message": user_message,
-                    "api_key": api_keys["google"]
+                    "api_key": api_keys["gemini"]
                 }
             },
             {
@@ -306,7 +306,7 @@ def _run_step_raw(
 
         gemini_result = call_gemini(
             message=gemini_message,
-            api_key=api_keys["google"]
+            api_key=api_keys["gemini"]
         )
         results.append({
             "step": 1,
