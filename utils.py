@@ -35,7 +35,7 @@ def parse_keyword_csv(uploaded_file) -> dict:
         }
     """
     try:
-  2     if uploaded_file is None:
+        if uploaded_file is None:
             return {
                 "success": False,
                 "data": None,
@@ -47,7 +47,7 @@ def parse_keyword_csv(uploaded_file) -> dict:
         content = uploaded_file.getvalue().decode('utf-8')
 
         # CSV/TSV判別
-  2     if '\t' in content.split('\n')[0]:
+        if '\t' in content.split('\n')[0]:
             df = pd.read_csv(io.StringIO(content), sep='\t')
         else:
             df = pd.read_csv(io.StringIO(content))
@@ -128,7 +128,7 @@ def parse_ga4_data(uploaded_file) -> dict:
         df.columns = df.columns.str.strip()
 
         # 必要なカラムを抽出
- 2      summary = {
+        summary = {
             "total_sessions": 0,
             "total_revenue": 0.0,
             "avg_conversion_rate": 0.0,
