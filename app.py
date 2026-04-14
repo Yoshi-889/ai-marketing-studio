@@ -524,10 +524,13 @@ def render_seo_mode_form() -> None:
         st.session_state.uploaded_data["keywords"] = keywords
         st.success(f"✅ {len(keywords)}件のキーワードを読み込みました")
 
-        # auto-suggest: AIがCSVからKWを提案
-        if st.session_state.form_data.get("auto_suggest_keywords") and not st.session_state.form_data.get("target_keywords"):
-            if st.button("🤖 AIにターゲットKWを提案しせる", key="btn_suggest_kw"):
-                with st.spinner("AIがキーワードを分析中..."):
+        # auto-suggest: AIがCSVからKWを自動提案（st.form内ではst.buttonが使えないため自動実行）
+        if (st.session_state.form_data.get("auto_suggest_keywords")
+                and not st.session_state.form_data.get("target_keywords")):
+            _suggest_key = f"_kw_suggested_{id(keywords)}"
+            if not st.session_state.get(_suggest_key):
+                st.session_state[_suggest_key] = True
+                with st.spinner("🤖 AIがターゲットKWを分析中..."):
                     try:
                         from pipeline import suggest_target_keywords
                         api_keys = st.session_state.get("api_keys_cache", {})
@@ -537,9 +540,10 @@ def render_seo_mode_form() -> None:
                             context=st.session_state.form_data.get("industry", "")
                         )
                         st.session_state.form_data["target_keywords"] = suggestion
-                        st.success("✅ ターゲットKWを提案しました")
+                        st.success("✅ AIがターゲットKWを提案しました")
                         st.rerun()
                     except Exception as e:
+                        st.session_state[_suggest_key] = False
                         st.error(f"提案エラー: {e}")
 
     ga4_file = st.file_uploader(
