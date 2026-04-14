@@ -943,10 +943,20 @@ def render_pipeline_execution() -> None:
         else:
             # エラーあり：エラー表示とリトライボタン（自動再実行しない）
             st.error(f"❌ エラーが発生しました: {st.session_state.pipeline_step_error}")
-            if st.button("このステップをやり直す"):
-                st.session_state.pipeline_step_error = None
-                pipeline.reset_current_step()
-                st.rerun()
+            col_retry, col_reset = st.columns(2)
+            with col_retry:
+                if st.button("🔁 このステップをやり直す", use_container_width=True):
+                    st.session_state.pipeline_step_error = None
+                    pipeline.reset_current_step()
+                    st.rerun()
+            with col_reset:
+                if st.button("🔄 新しい調査を始める", key="reset_from_exec_error", use_container_width=True):
+                    st.session_state.pipeline_state = None
+                    st.session_state.current_mode = None
+                    st.session_state.form_data = {}
+                    st.session_state.uploaded_data = {}
+                    st.session_state.pipeline_step_error = None
+                    st.rerun()
 
     # ステップ結果表社
     if pipeline.step_results:
@@ -1019,15 +1029,24 @@ def render_step_results(pipeline: PipelineState) -> None:
             st.divider()
 
     # ボタン
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("このステップをやり直す"):
+        if st.button("🔁 このステップをやり直す", use_container_width=True):
             pipeline.reset_current_step()
             st.rerun()
 
     with col2:
-        if st.button("この内容で次へ進む", type="primary"):
+        if st.button("✅ この内容で次へ進む", type="primary", use_container_width=True):
             pipeline.move_to_next_step()
+            st.rerun()
+
+    with col3:
+        if st.button("🔄 新しい調査を始める", key="reset_from_results", use_container_width=True):
+            st.session_state.pipeline_state = None
+            st.session_state.current_mode = None
+            st.session_state.form_data = {}
+            st.session_state.uploaded_data = {}
+            st.session_state.pipeline_step_error = None
             st.rerun()
 
 
@@ -1114,6 +1133,7 @@ def render_completion_screen(pipeline: PipelineState) -> None:
             st.session_state.pipeline_state = None
             st.session_state.form_data = {}
             st.session_state.uploaded_data = {}
+            st.session_state.pipeline_step_error = None
             st.rerun()
 
     with col2:
