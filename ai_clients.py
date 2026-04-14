@@ -80,7 +80,7 @@ def call_gemini(
     try:
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=user_message,
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -92,7 +92,7 @@ def call_gemini(
             "icon": "🔵",
             "success": True,
             "content": response.text,
-            "model": "gemini-2.0-flash",
+            "model": "gemini-2.5-flash",
             "role": role_name,
         }
     except Exception as e:
@@ -101,7 +101,7 @@ def call_gemini(
             "icon": "🔵",
             "success": False,
             "content": f"エラー: {str(e)}",
-            "model": "gemini-2.0-flash",
+            "model": "gemini-2.5-flash",
             "role": role_name,
         }
 
