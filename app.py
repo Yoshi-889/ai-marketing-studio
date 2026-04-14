@@ -517,7 +517,10 @@ def render_seo_mode_form() -> None:
         key="ga4_csv_upload"
     )
     if ga4_file:
-        ga4_data = parse_ga4_data(ga4_file)
+        ga4_data = parse_ga4_data(
+            ga4_file,
+            target_url=st.session_state.form_data.get("target_url", "")
+        )
         st.session_state.uploaded_data["ga4_data"] = ga4_data
         st.success("✅ GA4データを読み込みました")
 
@@ -708,7 +711,10 @@ def render_cro_mode_form() -> None:
         key="cro_ga4_csv_upload"
     )
     if ga4_file:
-        ga4_data = parse_ga4_data(ga4_file)
+        ga4_data = parse_ga4_data(
+            ga4_file,
+            target_url=st.session_state.form_data.get("analysis_url", "")
+        )
         st.session_state.uploaded_data["ga4_data"] = ga4_data
         st.success("✅ GA4データを読み込みました")
 
