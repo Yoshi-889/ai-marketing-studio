@@ -1,5 +1,5 @@
 import anthropic
-import google.genai
+import google.genai as genai
 import openai
 import requests
 from bs4 import BeautifulSoup
@@ -78,14 +78,14 @@ def call_gemini(
         APIレスポンスとメタデータを含む辞書
     """
     try:
-        google.genai.configure(api_key=api_key)
-        model = google.genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            system_instruction=system_prompt,
-        )
-        response = model.generate_content(
-            user_message,
-            generation_config={"temperature": temperature},
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=user_message,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=temperature,
+            ),
         )
         return {
             "name": "Gemini",
