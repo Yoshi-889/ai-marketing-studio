@@ -530,7 +530,7 @@ def render_seo_mode_form() -> None:
 
     if research_method == "URLを入力":
         st.session_state.form_data["competitor_urls"] = st.text_area(
-            "競合URLを1行1つせつ入力",
+            "競合URLを1行1つずつ入力",
             value=st.session_state.form_data.get("competitor_urls", ""),
             height=100,
             key="competitor_urls_input"
