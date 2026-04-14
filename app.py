@@ -285,6 +285,9 @@ def render_sidebar() -> dict:
 # モード選択画面
 # ============================================================================
 
+def render_mode_selector() -> str:
+    """モード選択画面"""====================================================
+
 def render_mode_selection() -> None:
     """モード選択画面"""
     st.markdown("# 🎯 AI Marketing Studio v1.0.0")
@@ -351,13 +354,13 @@ def render_basic_info_form() -> None:
     st.markdown("### 📋 基本情報")
 
     st.session_state.form_data["client_name"] = st.text_input(
-        "クライアント名（任意）",
+        "クライアント名（件意）",
         value=st.session_state.form_data.get("client_name", ""),
         key="client_name_input"
     )
 
     st.session_state.form_data["industry"] = st.text_input(
-        "業界/業種",
+        "f��界/業種",
         value=st.session_state.form_data.get("industry", ""),
         key="industry_input"
     )
@@ -492,11 +495,24 @@ def render_seo_mode_form() -> None:
         if screenshot_file:
             st.session_state.uploaded_data["page_screenshot"] = screenshot_file.getvalue()
 
-    else:
+    # ターゲットキーワード（両サブモード共通）
+    st.markdown("---")
+    st.markdown("#### 🎯 ターゲットキーワード設定")
+
+    col_kw, col_auto = st.columns([3, 1])
+    with col_kw:
         st.session_state.form_data["target_keywords"] = st.text_input(
-            "ターゲットキーワード",
+            "ターゲットキーワード（メインKW、複数はカンマ区切り）",
             value=st.session_state.form_data.get("target_keywords", ""),
+            placeholder="例: SEO対策, コンテンツマーケティング",
             key="target_keywords_input"
+        )
+    with col_auto:
+        st.session_state.form_data["auto_suggest_keywords"] = st.checkbox(
+            "🤖 AIが自動提案",
+            value=st.session_state.form_data.get("auto_suggest_keywords", False),
+            key="auto_suggest_kw_checkbox",
+            help="CSVをアップロード後、AIが最適なターゲットKWを提案します"
         )
 
     st.markdown("**キーワード・データアップロード（任意）**")
@@ -510,6 +526,24 @@ def render_seo_mode_form() -> None:
         keywords = parse_keyword_csv(keyword_file)
         st.session_state.uploaded_data["keywords"] = keywords
         st.success(f"✅ {len(keywords)}件のキーワードを読み込みました")
+
+        # auto-suggest: AIがCSVからKWを提案
+        if st.session_state.form_data.get("auto_suggest_keywords") and not st.session_state.form_data.get("target_keywords"):
+            if st.button("🤖 AIにターゲットKWを提案してした", key="btn_suggest_kw"):
+                with st.spinner("AIがキーワードを分析中..."):
+                    try:
+                        from pipeline import suggest_target_keywords
+                        api_keys = st.session_state.get("api_keys_cache", {})
+                        suggestion = suggest_target_keywords(
+                            keywords_data=keywords,
+                            api_keys=api_keys,
+                            context=st.session_state.form_data.get("industry", "")
+                        )
+                        st.session_state.form_data["target_keywords"] = suggestion
+                        st.success("✅ ターゲットKWを提案しました")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"提案エラー: {e}")
 
     ga4_file = st.file_uploader(
         "GA4データCSV（任意）",
@@ -578,7 +612,7 @@ def render_email_mode_form() -> None:
         st.session_state.uploaded_data["newsletter_analysis"] = analysis
         st.success("✅ メルマガを分析しました")
 
-    st.markdown("**テストデータ（任意）**")
+    st.markdown("*#テストデータ（任意）**")
     test_newsletter = st.file_uploader(
         "メルマガテスト（ビフォーアフター比較用）",
         type=["pdf", "txt"],
@@ -936,34 +970,52 @@ def render_step_results(pipeline: PipelineState) -> None:
 
     st.markdown(f"### Step {step_number} 完了")
 
-    # タブ表�V
+    # パネルディスカッション形式で表示
     if isinstance(latest_step, dict) and "results" in latest_step:
         results = latest_step["results"]
-        tab_names = [
-            f"🤖 {name}" for name in results.keys()
-        ]
 
-        tabs = st.tabs(tab_names)
+        AI_STYLES = {
+            "Claude":  {"color": "#7c3aed", "bg": "#f5f3ff", "icon": "🤖"},
+            "Gemini":  {"color": "#2563eb", "bg": "#eff6ff", "icon": "✨"},
+            "ChatGPT": {"color": "#059669", "bg": "#ecfdf5", "icon": "💬"},
+        }
 
-        for tab, (ai_name, content) in zip(tabs, results.items()):
-            with tab:
+        st.markdown("#### 💬 AIパネルディスカッション")
+
+        for ai_name, content in results.items():
+            style = AI_STYLES.get(ai_name, {"color": "#6b7280", "bg": "#f9fafb", "icon": "🔵"})
+            # エラーの場合は赤枠
+            is_error = isinstance(content, str) and content.strip().startswith("{'error'")
+            border_color = "#ef4444" if is_error else style["color"]
+            bg_color = "#fff1f2" if is_error else style["bg"]
+
+            st.markdown(
+                f"""<div style="border-left:4px solid {border_color};padding:14px 18px;
+                margin-bottom:16px;background:{bg_color};border-radius:0 10px 10px 0;">
+                <div style="font-weight:700;color:{border_color};font-size:15px;margin-bottom:8px;">
+                {style['icon']} {ai_name}</div>
+                </div>""",
+                unsafe_allow_html=True
+            )
+            if is_error:
+                st.error(f"⚠️ {ai_name}: {content}")
+            else:
                 st.markdown(content)
 
-                # 修正・補足入力欄
-                st.markdown("---")
-                edit_key = f"edit_{step_number}_{ai_name}"
-                user_edit = st.text_area(
-                    "修正・補足（任意）",
-                    key=edit_key,
-                    height=100
-                )
-
-                if user_edit:
-                    st.session_state.user_edits.append({
-                        "step": step_number,
-                        "ai": ai_name,
-                        "edit": user_edit
-                    })
+            # 修正・補足入力欄
+            edit_key = f"edit_{step_number}_{ai_name}"
+            user_edit = st.text_area(
+                f"{ai_name} への修正・補足（任意）",
+                key=edit_key,
+                height=80
+            )
+            if user_edit:
+                st.session_state.user_edits.append({
+                    "step": step_number,
+                    "ai": ai_name,
+                    "edit": user_edit
+                })
+            st.divider()
 
     # ボタン
     col1, col2 = st.columns(2)
@@ -1108,6 +1160,7 @@ def main() -> None:
 
     # サイドバー
     api_keys = render_sidebar()
+    st.session_state.api_keys_cache = api_keys  # KW自動提案などで参照できるようにキャッシュ
 
     # メインエリア
     if st.session_state.pipeline_state is not None:
