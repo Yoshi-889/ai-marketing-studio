@@ -216,6 +216,8 @@ def _run_step_raw(
     if previous_results is None:
         previous_results = []
 
+    roles = MODE_CONFIG.get(mode, {}).get("roles", {})
+
     if step == 0:
         # Step 0: 並列実行で3つの分析を実行
         user_message = build_user_message(
@@ -230,24 +232,27 @@ def _run_step_raw(
                 "name": "Claude",
                 "fn": call_claude,
                 "kwargs": {
-                    "message": user_message,
-                    "api_key": api_keys["anthropic"]
+                    "user_message": user_message,
+                    "api_key": api_keys["anthropic"],
+                    "system_prompt": roles.get("claude", {}).get("system_prompt", ""),
                 }
             },
             {
                 "name": "Gemini",
                 "fn": call_gemini,
                 "kwargs": {
-                    "message": user_message,
-                    "api_key": api_keys["gemini"]
+                    "user_message": user_message,
+                    "api_key": api_keys["gemini"],
+                    "system_prompt": roles.get("gemini", {}).get("system_prompt", ""),
                 }
             },
             {
                 "name": "ChatGPT",
                 "fn": call_chatgpt,
                 "kwargs": {
-                    "message": user_message,
-                    "api_key": api_keys["openai"]
+                    "user_message": user_message,
+                    "api_key": api_keys["openai"],
+                    "system_prompt": roles.get("chatgpt", {}).get("system_prompt", ""),
                 }
             }
         ]
@@ -283,8 +288,9 @@ def _run_step_raw(
         )
 
         claude_result = call_claude(
-            message=user_message,
-            api_key=api_keys["anthropic"]
+            user_message=user_message,
+            api_key=api_keys["anthropic"],
+            system_prompt=roles.get("claude", {}).get("system_prompt", ""),
         )
         results.append({
             "step": 1,
@@ -305,8 +311,9 @@ def _run_step_raw(
         )
 
         gemini_result = call_gemini(
-            message=gemini_message,
-            api_key=api_keys["gemini"]
+            user_message=gemini_message,
+            api_key=api_keys["gemini"],
+            system_prompt=roles.get("gemini", {}).get("system_prompt", ""),
         )
         results.append({
             "step": 1,
@@ -327,8 +334,9 @@ def _run_step_raw(
         )
 
         chatgpt_result = call_chatgpt(
-            message=chatgpt_message,
-            api_key=api_keys["openai"]
+            user_message=chatgpt_message,
+            api_key=api_keys["openai"],
+            system_prompt=roles.get("chatgpt", {}).get("system_prompt", ""),
         )
         results.append({
             "step": 1,
@@ -346,9 +354,10 @@ def _run_step_raw(
         integration_prompt = get_integration_prompt(mode, previous_results, form_data)
 
         claude_result = call_claude(
-            message=integration_prompt,
-            api_key=api_keys["anthropic"]
-        )
+            user_message=integration_prompt,
+            api_key=api_keys["anthropic"],
+            system_prompt=roles.get("claude", {}).get("system_prompt", ""),
+           )
 
         if progress_callback:
             progress_callback("Claude (Integration)")
