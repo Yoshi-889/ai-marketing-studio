@@ -10,6 +10,60 @@ from ai_clients import (
 )
 
 
+def suggest_target_keywords(
+    keywords_data: list,
+    api_keys: dict,
+    context: str = ""
+) -> str:
+    """
+    アップロードされたキーワードCSVからターゲットKWをAIが提案する
+
+    Args:
+        keywords_data: parse_keyword_csv() の結果リスト
+        api_keys: APIキー辞書
+        context: 業界・業種などのコンテキスト
+
+    Returns:
+        カンマ区切りの提案キーワード文字列
+    """
+    # 上位50件のキーワードを抽出
+    kw_list = []
+    for kw in keywords_data[:50]:
+        if isinstance(kw, dict):
+            keyword = kw.get("keyword") or kw.get("キーワード") or str(kw)
+            volume = kw.get("volume") or kw.get("検索ボリューム") or kw.get("Volume") or ""
+            difficulty = kw.get("difficulty") or kw.get("KD") or kw.get("競合性") or ""
+            kw_list.append(f"{keyword} (ボリューム:{volume}, 難易度:{difficulty})")
+        else:
+            kw_list.append(str(kw))
+
+    prompt = f"""以下のキーワードリストから、SEO・マーケティング観点で最も効果的なターゲットキーワードを5〜10個選んでください。
+
+業界・コンテキスト: {context}
+
+キーワードリスト:
+{chr(10).join(kw_list)}
+
+選定基準:
+- 検索ボリュームと難易度のバランス
+- ビジネス目標への関連性
+- コンバージョン意図の高さ
+
+出力形式（カンマ区切りのキーワードのみ、理由は不要）:
+キーワード1, キーワード2, キーワード3, ...
+"""
+
+    result = call_claude(
+        user_message=prompt,
+        api_key=api_keys.get("anthropic", ""),
+        system_prompt="あなたはSEOとコンテンツマーケティングの専門家です。キーワード選定のプロとして的確な提案を行ってください。",
+    )
+    # エラーの場合は空文字を返す
+    if isinstance(result, dict) and "error" in result:
+        return ""
+    return str(result).strip()
+
+
 class PipelineState:
     """パイプラインの状態を管理するクラス"""
 
@@ -127,6 +181,7 @@ def build_user_message(
     base_info = f"""
 クライアント: {form_data.get('client_name', '')}
 業界: {form_data.get('industry', '')}
+ターゲットキーワード: {form_data.get('target_keywords', '')}
 ターゲットペルソナ: {form_data.get('target_persona', '')}
 USP: {form_data.get('usp', '')}
 競合: {form_data.get('competitors', '')}
@@ -169,19 +224,19 @@ USP: {form_data.get('usp', '')}
         if "ng_expressions" in learning_data:
             message += f"NG表現: {', '.join(learning_data['ng_expressions'])}\n"
 
-    # ステップ別の追加情報
+    # ステップ別の追加情報（パネルディスカッション形式）
     if step == 0:
-        message += f"\nタスク: 初期分析を実施してください。{mode_config.get('step_0_prompt', '')}"
+        message += f"\n---\n【パネルディスカッション Round 1】\nあなたはマーケティング専門家パネリストの一人です。他のAIパネリストとは独立して、あなた固有の視点・専門性で分析を行ってください。\nタスク: {mode_config.get('step_0_prompt', '初期分析を実施してください。')}"
     elif step == 1 and previous_results:
-        message += f"\n前のステップの分析結果:\n"
+        message += f"\n---\n【パネルディスカッション Round 2】\n前のパネリストたちの分析を踏まえ、あなたの意見を述べてください。同意・補足・異なる視点があれば明確に示してください。\n\n前のパネリストの意見:\n"
         for i, result in enumerate(previous_results):
-            message += f"\n{i+1}. {result.get('ai_name', '')}: {result.get('content', '')[:500]}...\n"
-        message += f"\nタスク: これらの分析を参考にして、コンテンツを生成してください。{mode_config.get('step_1_prompt', '')}"
+            message += f"\n■ {result.get('ai_name', f'パネリスト{i+1}')}の意見:\n{result.get('content', '')[:600]}\n"
+        message += f"\nタスク: 上記を踏まえてコンテンツを生成し、各パネリストとの相違点・共通点も述べてください。{mode_config.get('step_1_prompt', '')}"
     elif step == 2 and previous_results:
-        message += f"\n前のステップの全結果:\n"
+        message += f"\n---\n【パネルディスカッション 統合フェーズ】\n全パネリストの議論を整理し、最終的なコンセンサスと推奨事項をまとめてください。\n\n全パネリストの意見:\n"
         for i, result in enumerate(previous_results):
-            message += f"\n{i+1}. {result.get('ai_name', '')}: {result.get('content', '')[:300]}...\n"
-        message += f"\nタスク: これらの結果を統合して、最終的な成果物を生成してください。{mode_config.get('step_2_prompt', '')}"
+            message += f"\n■ {result.get('ai_name', f'パネリスト{i+1}')}:\n{result.get('content', '')[:400]}\n"
+        message += f"\nタスク: 議論を統合し、最終成果物を生成してください。{mode_config.get('step_2_prompt', '')}"
 
     return message
 
