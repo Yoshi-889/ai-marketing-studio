@@ -890,17 +890,28 @@ def render_pipeline_execution() -> None:
     st.progress(progress, text=f"Step {current_step}/{total_steps}")
 
     # 各ステップ実行（まだ結果がないステップのみ実行）
+    # エラー状態をsession_stateで管理（ボタンクリック後の再実行ループを防ぐ）
+    if "pipeline_step_error" not in st.session_state:
+        st.session_state.pipeline_step_error = None
+
     if not pipeline.is_completed() and not pipeline.has_current_step_result():
-        with st.spinner(f"Step {current_step}/{total_steps}: {pipeline.get_current_step_name()}中..."):
-            try:
-                result = execute_step(pipeline)
-                pipeline.add_step_result(result)
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ エラーが発生しました: {str(e)}")
-                if st.button("このステップをやり直す"):
-                    pipeline.reset_current_step()
+        if st.session_state.pipeline_step_error is None:
+            # エラーなし：ステップを実行
+            with st.spinner(f"Step {current_step}/{total_steps}: {pipeline.get_current_step_name()}中..."):
+                try:
+                    result = execute_step(pipeline)
+                    pipeline.add_step_result(result)
                     st.rerun()
+                except Exception as e:
+                    st.session_state.pipeline_step_error = str(e)
+                    st.rerun()
+        else:
+            # エラーあり：エラー表示とリトライボタン（自動再実行しない）
+            st.error(f"❌ エラーが発生しました: {st.session_state.pipeline_step_error}")
+            if st.button("このステップをやり直す"):
+                st.session_state.pipeline_step_error = None
+                pipeline.reset_current_step()
+                st.rerun()
 
     # ステップ結果表社
     if pipeline.step_results:
