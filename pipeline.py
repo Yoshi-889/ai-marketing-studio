@@ -228,7 +228,7 @@ def _run_step_raw(
         tasks = [
             {
                 "name": "Claude",
-                "func": call_claude,
+                "fn": call_claude,
                 "kwargs": {
                     "message": user_message,
                     "api_key": api_keys["anthropic"]
@@ -236,7 +236,7 @@ def _run_step_raw(
             },
             {
                 "name": "Gemini",
-                "func": call_gemini,
+                "fn": call_gemini,
                 "kwargs": {
                     "message": user_message,
                     "api_key": api_keys["gemini"]
@@ -244,7 +244,7 @@ def _run_step_raw(
             },
             {
                 "name": "ChatGPT",
-                "func": call_chatgpt,
+                "fn": call_chatgpt,
                 "kwargs": {
                     "message": user_message,
                     "api_key": api_keys["openai"]
