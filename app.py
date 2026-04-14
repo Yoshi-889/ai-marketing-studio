@@ -996,7 +996,7 @@ def render_step_results(pipeline: PipelineState) -> None:
         for ai_name, content in results.items():
             style = AI_STYLES.get(ai_name, {"color": "#6b7280", "bg": "#f9fafb", "icon": "🔵"})
             # エラーの場合は赤枠
-            is_error = isinstance(content, str) and content.strip().startswith("{'error'")
+            is_error = isinstance(content, str) and content.startswith("❌ エラー:")
             border_color = "#ef4444" if is_error else style["color"]
             bg_color = "#fff1f2" if is_error else style["bg"]
 
